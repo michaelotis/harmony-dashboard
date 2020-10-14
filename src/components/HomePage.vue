@@ -13,6 +13,7 @@
   background-position: bottom center;
   color: var(--primary-text-color);
   display: flex;
+  overflow-x: hidden;
   header {
     .flex-horizontal;
     align-items: flex-end;
@@ -29,98 +30,108 @@
       overflow: auto;
     }
   }
+
+  .total-txs {
+    margin-right: 20px;
+  }
+
+  .header-no-dropdown {
+    padding-bottom: 20px;
+    padding-top: 20px;
+  }
 }
+
+.show-more-container {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 20px;
+
+  .show-more-button {
+    padding: 6px 25px;
+    border: 1px solid #008ddc50;
+    border-radius: 5px;
+    transition: all 0.3s;
+
+    font-weight: 400;
+    font-size: 0.9em;
+
+    &:hover {
+      /*border: 1px solid #1b295e;*/
+      /*color: #1b295e;*/
+    }
+  }
+}
+
+.pending-tx-table-empty-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+.search-bar-body {
+  padding: 30px 40px 50px 60px;
+  text-align: center;
+  margin: 0 -601.5rem;
+  background: linear-gradient(0deg, white 50%, #5f2c82 50%);
+}
+
+
+.search-bar-input {
+  width: 800px;
+  height: 40px;
+
+  font-size: 15px;
+
+  padding: 30px 30px !important;
+  border: 0px !important;
+  border-radius: 5px !important;
+  box-shadow: 0 0 0.4em rgba(0, 0, 0, 0.5);
+	outline: none;
+
+}
+input:focus {
+  outline:none !important;
+}
+
 </style>
 
 <template>
   <div class="home-page explorer-page page">
     <div class="home-body explorer-body">
       <div v-if="globalData.blocks.length" class="container">
+        <div class="search-bar-body">
+          <input
+            type="text"
+            placeholder="Search for Blocks / Transactions / Accounts..."
+            class="search-bar-input"
+            v-model="textSearchBar"
+            @keyup.enter="searchQuery()"
+          />
+        </div>
         <div v-if="!!coinStats" class="explorer-card status-card">
           <CoinStats :stats="coinStats" />
         </div>
-
-        <div class="explorer-card status-card">
-          <div class="row">
-            <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">
-              <div class="flex-horizontal">
-                <div class="icon-column">
-                  <div class="data-icon-circle">
-                    <div class="data-icon icon-block-count" />
-                  </div>
-                </div>
-                <div class="data-num-column">
-                  <div class="data-num">
-                    {{ globalData.blockCount | number }}
-                  </div>
-                  <h1>Block Count</h1>
-                </div>
-              </div>
-            </div>
-            <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">
-              <div class="flex-horizontal">
-                <div class="icon-column">
-                  <div class="data-icon-circle">
-                    <div class="data-icon icon-tx-count" />
-                  </div>
-                </div>
-                <div class="data-num-column">
-                  <div class="data-num">
-                    {{ globalData.blockLatency | blockLatency }}
-                  </div>
-                  <h1>Block Latency</h1>
-                </div>
-              </div>
-            </div>
-            <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">
-              <div class="flex-horizontal">
-                <div class="icon-column">
-                  <div class="data-icon-circle">
-                    <div class="data-icon icon-node-count" />
-                  </div>
-                </div>
-                <div class="data-num-column">
-                  <div class="data-num">
-                    {{ globalData.nodeCount | number }}
-                  </div>
-                  <h1>Node Count</h1>
-                </div>
-              </div>
-            </div>
-            <div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">
-              <div class="flex-horizontal">
-                <div class="icon-column">
-                  <div class="data-icon-circle">
-                    <div class="data-icon icon-shard-count" />
-                  </div>
-                </div>
-                <div class="data-num-column">
-                  <div class="data-num">
-                    {{ globalData.shardCount | number }}
-                  </div>
-                  <h1>Shard Count</h1>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
         <div class="row">
-          <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12">
+          <div class="col-xs-12 col-sm-12 col-md-6 col-lg-6">
             <div class="explorer-card latest-block-card">
               <header>
                 <h1 class="flex-grow">
                   Latest Blocks
                 </h1>
                 <div class="secondary-info">
-                  <div class="timer">
-                    Updated
-                    {{
-                      Math.round(
-                        Math.max((now - globalData.lastUpdateTime) / 1000, 0)
-                      ) | number
-                    }}s ago...
-                  </div>
-                  <span class="total-block-num" />
+                  <select v-model="selectedBlocksShard">
+                    <option value="-1">
+                      All Shards
+                    </option>
+                    <option
+                      v-for="shard in globalData.shards"
+                      :key="shard.id"
+                      :value="shard.id"
+                    >
+                      Shard {{ shard.id }}
+                    </option>
+                  </select>
                 </div>
               </header>
               <div class="explorer-card-body">
@@ -136,17 +147,11 @@
                       Height
                     </div>
                     <div class="th text-right">
-                      Timestamp
-                    </div>
-                    <div class="th text-right">
                       Age
-                    </div>
-                    <div v-if="showTx" class="th text-right">
-                      Transactions
                     </div>
                   </div>
                   <div
-                    v-for="block in globalData.blocks"
+                    v-for="block in filterBlocksByShards"
                     :key="block.id"
                     class="tr"
                   >
@@ -157,7 +162,7 @@
                     </div>
                     <div class="td">
                       <router-link :to="'/block/' + block.id">
-                        {{ block.id | shorten }}
+                        {{ block.id.substring(0, 8) }}...
                       </router-link>
                     </div>
                     <div class="td">
@@ -166,48 +171,41 @@
                       </router-link>
                     </div>
                     <div class="td text-right">
-                      {{ block.timestamp | timestamp }}
-                    </div>
-                    <div class="td text-right">
                       {{ block.timestamp | age }}
-                    </div>
-                    <div v-if="showTx" class="td text-right">
-                      {{ block.txCount }}
                     </div>
                   </div>
                 </div>
               </div>
-              <!-- <footer class="button-only-footer">
+              <footer class="button-only-footer">
                 <router-link
                   tag="button"
                   class="btn btn-light btn-block btn-mini"
                   to="blocks"
-                >View all blocks</router-link>
-              </footer>-->
+                >
+                  Show all blocks
+                </router-link>
+              </footer>
             </div>
           </div>
-
-          <div
-            v-if="!showStaking"
-            class="col-xs-12 col-sm-12 col-md-12 col-lg-12"
-          >
+          <div class="col-xs-12 col-sm-12 col-md-6 col-lg-6">
             <div class="explorer-card latest-block-card">
               <header>
-                <TransactionTableTabs
-                  :value="showStaking"
-                  :on-change="changeTab"
-                  title-prefix="Latest"
-                />
+                <h1 class="flex-grow">
+                  Latest Transactions
+                </h1>
                 <div class="secondary-info">
-                  <div class="timer">
-                    Updated
-                    {{
-                      Math.round(
-                        Math.max((now - globalData.lastUpdateTime) / 1000, 0)
-                      ) | number
-                    }}s ago...
-                  </div>
-                  <span class="total-block-num" />
+                  <select v-model="selectedTransactionsShard">
+                    <option value="-1">
+                      All Shards
+                    </option>
+                    <option
+                      v-for="shard in globalData.shards"
+                      :key="shard.id"
+                      :value="shard.id"
+                    >
+                      Shard {{ shard.id }}
+                    </option>
+                  </select>
                 </div>
               </header>
               <div class="explorer-card-body">
@@ -220,117 +218,14 @@
                       Hash
                     </div>
                     <div class="th">
-                      From
-                    </div>
-                    <div class="th">
-                      To
-                    </div>
-                    <div class="th">
-                      Age
-                    </div>
-                    <div class="th">
                       Value
                     </div>
                     <div class="th text-right">
-                      Txn Fee
-                    </div>
-                  </div>
-                  <div v-for="tx in globalData.txs" :key="tx.id" class="tr">
-                    <div class="td">
-                      <router-link :to="'/shard/' + tx.shardID">
-                        {{ tx.shardID }}
-                      </router-link>
-                    </div>
-                    <div class="td">
-                      <router-link :to="'/tx/' + tx.id">
-                        {{ tx.id | shorten }}
-                      </router-link>
-                    </div>
-                    <div class="td">
-                      <router-link :to="'/address/' + tx.from.bech32">
-                        {{ tx.from.bech32 | shorten }}
-                      </router-link>
-                    </div>
-                    <div class="td">
-                      <router-link :to="'/address/' + tx.to.bech32">
-                        {{ tx.to.bech32 | shorten }}
-                      </router-link>
-                    </div>
-                    <div class="td">
-                      {{ tx.timestamp | age }}
-                    </div>
-                    <div class="td no-break">
-                      {{ tx.value | amount }}
-                    </div>
-                    <div class="td text-right no-break">
-                      {{ tx | fee }}
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <!-- <footer class="button-only-footer">
-                <router-link
-                  tag="button"
-                  class="btn btn-light btn-block btn-mini"
-                  to="txs"
-                >View all transactions</router-link>
-              </footer>-->
-            </div>
-          </div>
-
-          <div
-            v-if="showStaking"
-            class="col-xs-12 col-sm-12 col-md-12 col-lg-12"
-          >
-            <div class="explorer-card latest-block-card">
-              <header>
-                <TransactionTableTabs
-                  :value="showStaking"
-                  :on-change="changeTab"
-                  title-prefix="Latest"
-                />
-                <div class="secondary-info">
-                  <div class="timer">
-                    Updated
-                    {{
-                      Math.round(
-                        Math.max((now - globalData.lastUpdateTime) / 1000, 0)
-                      ) | number
-                    }}s ago...
-                  </div>
-                  <span class="total-block-num" />
-                </div>
-              </header>
-              <div class="explorer-card-body">
-                <div class="explorer-table-responsive latest-tx-table">
-                  <div class="tr">
-                    <div class="th">
-                      Shard
-                    </div>
-                    <div class="th">
-                      Hash
-                    </div>
-                    <div class="th">
-                      Type
-                    </div>
-                    <div class="th">
-                      Validator
-                    </div>
-                    <div class="th">
-                      Delegator
-                    </div>
-                    <div class="th">
                       Age
-                    </div>
-                    <div class="th">
-                      Value
-                    </div>
-                    <div class="th text-right">
-                      Txn Fee
                     </div>
                   </div>
                   <div
-                    v-for="tx in globalData.stakingTxs"
+                    v-for="tx in filterTransactionsByShards"
                     :key="tx.id"
                     class="tr"
                   >
@@ -340,58 +235,138 @@
                       </router-link>
                     </div>
                     <div class="td">
-                      <router-link :to="'/staking-tx/' + tx.id">
-                        {{ tx.id | shorten }}
+                      <router-link :to="'/tx/' + tx.id">
+                        {{ tx.id.substring(0, 8) }}...
                       </router-link>
                     </div>
                     <div class="td">
-                      {{ tx.type }}
-                    </div>
-                    <div class="td">
-                      <router-link
-                        v-if="tx.validator.bech32"
-                        :to="
-                          '/address/' + tx.validator.bech32 + '?txType=staking'
-                        "
-                      >
-                        {{ tx.validator.bech32 | shorten }}
-                      </router-link>
-                      <div v-else>
-                        -
-                      </div>
-                    </div>
-                    <div class="td">
-                      <router-link
-                        v-if="tx.delegator.bech32"
-                        :to="
-                          '/address/' + tx.delegator.bech32 + '?txType=staking'
-                        "
-                      >
-                        {{ tx.delegator.bech32 | shorten }}
-                      </router-link>
-                      <div v-else>
-                        -
-                      </div>
-                    </div>
-                    <div class="td">
-                      {{ tx.timestamp | age }}
-                    </div>
-                    <div class="td no-break">
                       {{ tx.value | amount }}
                     </div>
-                    <div class="td text-right no-break">
-                      {{ tx | fee }}
+                    <div class="td text-right">
+                      {{ tx.timestamp | age }}
                     </div>
                   </div>
                 </div>
               </div>
-              <!-- <footer class="button-only-footer">
+              <footer class="button-only-footer">
                 <router-link
                   tag="button"
                   class="btn btn-light btn-block btn-mini"
                   to="txs"
-                >View all transactions</router-link>
-              </footer>-->
+                >
+                  Show all transactions
+                </router-link>
+              </footer>
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div v-if="!showStaking" class="col-xs-12 col-sm-12 col-md-6 col-lg-6">
+            <div class="explorer-card latest-block-card">
+              <header class="header-no-dropdown">
+                <h1 class="flex-grow">
+                  Top Validators
+                </h1>
+              </header>
+              <div class="explorer-card-body">
+                <div class="explorer-table-responsive latest-tx-table">
+                  <div class="tr">
+                    <div class="th">
+                      Name
+                    </div>
+                    <div class="th">
+                      Fee Rate
+                    </div>
+                    <div class="th text-right">
+                      Total Stake
+                    </div>
+                  </div>
+                  <div
+                    v-for="v in globalData.validators"
+                    :key="v.name"
+                    class="tr"
+                  >
+                    <div class="td">
+                      <a :href="v.website" target="_blank">
+                        {{ v.name }}
+                      </a>
+                    </div>
+                    <div class="td">
+                      {{
+                        Math.round(parseFloat(v.fee_rate) * 10000) / 100 + '%'
+                      }}
+                    </div>
+                    <div class="td text-right">
+                      {{ Math.round(v.total_delegation) | number }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-xs-12 col-sm-12 col-md-6 col-lg-6">
+            <div class="explorer-card latest-block-card">
+              <header>
+                <h1 class="flex-grow">
+                  Pending Transactions
+                </h1>
+                <div class="secondary-info">
+                  <select v-model="selectedPendingTransactionsShard">
+                    <option value="-1">
+                      All Shards
+                    </option>
+                    <option
+                      v-for="shard in globalData.shards"
+                      :key="shard.id"
+                      :value="shard.id"
+                    >
+                      Shard {{ shard.id }}
+                    </option>
+                  </select>
+                </div>
+              </header>
+              <div class="explorer-card-body">
+                <div
+                  v-if="emptyPendingTransactions"
+                  class="pending-tx-table-empty-container"
+                >
+                  <h3 class="pending-tx-table-empty-message">
+                    No Pending Transactions
+                  </h3>
+                </div>
+                <div v-else>
+                  <div class="explorer-table-responsive latest-tx-table">
+                    <div class="tr">
+                      <div class="th">
+                        Shard
+                      </div>
+                      <div class="th">
+                        Hash
+                      </div>
+                      <div class="th text-right">
+                        Value
+                      </div>
+                    </div>
+                    <div
+                      v-for="tx in filterPendingTransactionsByShards"
+                      :key="tx.hash"
+                      class="tr"
+                    >
+                      <div class="td">
+                        {{ tx.shard }}
+                      </div>
+                      <div class="td">
+                        <router-link :to="'/tx/' + tx.hash">
+                          {{ tx.hash.substring(0, 32) }}...
+                        </router-link>
+                      </div>
+                      <div class="td text-right">
+                        {{ tx.value | amount }}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -405,16 +380,17 @@
 
 <script>
 import store from '../explorer/store';
+import service from '../explorer/service';
+import NodeWebsocket from '../explorer/node-websocket';
 import LoadingMessage from './LoadingMessage';
 import CoinStats from './CoinStats';
-import TransactionTableTabs from './TransactionTableTabs';
+import Chart from 'chart.js';
 
 export default {
   name: 'HomePage',
   components: {
     LoadingMessage,
     CoinStats,
-    TransactionTableTabs,
   },
   data() {
     return {
@@ -425,6 +401,15 @@ export default {
       now: Date.now(),
       showTx: true,
       coinStats: null,
+
+      textSearchBar: '',
+
+      loadingTransactionVolumeChart: true,
+
+      selectedBlocksShard: '-1',
+      selectedTransactionsShard: '-1',
+      selectedPendingTransactionsShard: '-1',
+      selectedTransactionVolumeTimeframe: '48', // hours
     };
   },
   computed: {
@@ -434,6 +419,58 @@ export default {
     showStaking() {
       return this.$route.query.txType === 'staking' ? true : false;
     },
+    filterBlocksByShards() {
+      const selectedShard = this.selectedBlocksShard;
+
+      if (selectedShard === '-1') {
+        return this.globalData.blocks.slice(0, 10);
+      }
+
+      return this.globalData.shards[selectedShard].blocks.slice(0,10);
+    },
+    filterTransactionsByShards() {
+      const selectedShard = this.selectedTransactionsShard;
+
+      if (selectedShard == '-1') {
+        return this.globalData.txs.slice(0, 10);
+      }
+
+      return this.globalData.shards[selectedShard].txs.slice(0,10);
+    },
+    filterPendingTransactionsByShards() {
+      const selectedShard = this.selectedPendingTransactionsShard;
+      const pendingTxs = this.globalData.pendingTxs;
+
+      if (selectedShard == '-1') {
+        let txs = [];
+
+        for (let shard in pendingTxs) {
+          if (Object.prototype.hasOwnProperty.call(pendingTxs, shard)) {
+            txs.push.apply(txs, pendingTxs[shard]);
+          }
+        }
+
+        return txs;
+      }
+
+      return pendingTxs[selectedShard];
+    },
+    emptyPendingTransactions() {
+      const selectedShard = this.selectedPendingTransactionsShard;
+      const pendingTxs = this.globalData.pendingTxs;
+
+      if (selectedShard == '-1') {
+        for (let shard in pendingTxs) {
+          if (Object.prototype.hasOwnProperty.call(pendingTxs, shard)) {
+            if (pendingTxs[shard].length > 0) return false;
+          }
+        }
+
+        return true;
+      }
+
+      return (pendingTxs[selectedShard].length === 0);
+    }
   },
   watch: {
     globalData() {
@@ -441,11 +478,19 @@ export default {
     },
   },
   mounted() {
+
     this.resetTimer();
 
-    // service.getCoinStats().then(stats => {
-    //   this.coinStats = stats;
-    // });
+    this.updateCoinStats();
+    setInterval(this.updateCoinStats, 10000);
+
+    // Update Validator data
+    // Update Pending Transaction data
+    // Every 10 seconds
+    setInterval(() => {
+      NodeWebsocket.GetValidators();
+      NodeWebsocket.GetPendingTransactions();
+    }, 30000);
   },
   methods: {
     changeTab(value) {
@@ -460,6 +505,64 @@ export default {
       this.timer = setInterval(() => {
         this.now = Date.now();
       }, 1000);
+    },
+    searchQuery() {
+      let input = this.textSearchBar.trim();
+      this.textSearchBar = '';
+
+      // is block height?
+      if (input.substring(0,2) !== '0x' &&
+        input.substring(0,3) !== 'one') {
+        let block_height = parseInt(input.replaceAll(',', ''));
+        if (isNaN(block_height) == false) {
+          service
+            .getBlockHashByNumber(block_height)
+            .then(result => {
+              let hash = result['data']['hash'];
+
+              this.$router.push(`/block/${hash}`);
+            });
+
+            return;
+        }
+      }
+
+      // is pending?
+      let pendingTxs = store.data.pendingTxs;
+      for (let shard_id in pendingTxs) {
+        if (pendingTxs.hasOwnProperty(shard_id)) {
+          for (let i = 0; i < pendingTxs[shard_id].length; i ++) {
+            if (pendingTxs[shard_id][i]['hash'] == input) {
+              this.$router.push(`/tx/${input}`);
+              return;
+            }
+          }
+        }
+      }
+
+      service
+        .search(input)
+        .then(result => {
+          if (result.type === 'block') {
+            this.$router.push(`/block/${input}`);
+          } else if (result.type === 'tx') {
+            this.$router.push(`/tx/${input}`);
+          } else if (result.type === 'address') {
+            this.$router.push(`/address/${input}`);
+          } else {
+            alert('invalid search query');
+          }
+        })
+        .catch(r => {
+          alert('invalid search query')
+        });
+    },
+    updateCoinStats() {
+      service.getCoinStats()
+        .then(result => {
+
+          this.coinStats = result['coin'];
+        });
     },
   },
 };

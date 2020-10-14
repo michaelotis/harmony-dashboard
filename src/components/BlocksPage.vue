@@ -1,16 +1,39 @@
 <style scoped lang="less">
 @import '../less/common.less';
+
+.shard-dropdown {
+  margin: 4px 10px;
+}
+
 </style>
 
 <template>
   <div class="blocks-page explorer-page page">
     <div class="blocks-body explorer-body">
       <div class="container">
+        <div class="header-spacing" />
         <div class="explorer-card">
           <header>
             <h1 class="flex-grow">
-              Blocks
+              <div class="flex-horizontal">
+                Blocks in 
+                <div class="secondary-info shard-dropdown">
+                  <select v-model="selectedBlocksShard">
+                    <option value="-1">
+                      All Shards
+                    </option>
+                    <option
+                      v-for="shard in globalData.shards"
+                      :key="shard.id"
+                      :value="shard.id"
+                    >
+                      Shard {{ shard.id }}
+                    </option>
+                  </select>
+                </div>
+              </div>
             </h1>
+            
             <div class="pagination-controls">
               <span class="total-block-num">
                 {{ globalData.blockCount }} blocks
@@ -71,7 +94,7 @@
                   Size (bytes)
                 </th>
               </tr>
-              <tr v-for="block in blocks" :key="block.id" class="container">
+              <tr v-for="block in filterBlocksByShards" :key="block.id" class="container">
                 <td>
                   <!-- <router-link :to="'/shard/' + block.shardID"> -->
                   {{ block.shardID }}
@@ -124,6 +147,7 @@ export default {
   data() {
     return {
       globalData: store.data,
+      selectedBlocksShard: '-1',
       blocks: [],
       pageIndex: 0,
       pageSize: 50,
@@ -132,6 +156,15 @@ export default {
   computed: {
     pageCount() {
       return Math.ceil(this.globalData.blockCount / this.pageSize);
+    },
+    filterBlocksByShards() {
+      const selectedShard = this.selectedBlocksShard;
+
+      if (selectedShard === '-1') {
+        return this.blocks;
+      }
+
+      return this.globalData.shards[selectedShard].blocks;
     },
   },
   watch: {

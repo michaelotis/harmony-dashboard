@@ -4,14 +4,14 @@
   position: fixed;
   left: 0;
   right: 0;
-  z-index: 1000;
+  z-index: 10;
   top: 0;
   color: var(--color-site-header-text);
   transition: background-color @anim-duration @anim-easing,
     color @anim-duration @anim-easing;
   a.navbar-brand {
     display: inline-block;
-    height: 7em;
+    height: 4em;
     width: 10em;
     box-sizing: border-box;
     background-image: url(../assets/harmony-logo-white.svg);
@@ -32,81 +32,38 @@
     display: flex;
     align-items: center;
   }
+
   a.navbar-nav {
     text-decoration: none;
+    color: white;
+    border-radius: 5px;
     padding: @space-md @space-md;
-    transition: color @anim-duration @anim-easing;
-    color: #a09ea7;
+    margin: 2px;
+    box-shadow: 0 0px 0px rgba(0,0,0,0.15);
+    transition: box-shadow 0.3s ease-in-out;
     &:hover {
-      color: inherit;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.3);
     }
   }
+
   .tagline {
-    font-weight: 200;
+    font-weight: 300;
     margin-bottom: -0.2em;
   }
-  .search {
-    width: 15em;
-    margin-left: @space-md;
-    flex: none;
-    height: 2em;
-    overflow: hidden;
-    position: relative;
-    color: #fff;
-    border: 1px solid #fff;
-    border-radius: 2em;
-    .search-icon {
-      position: absolute;
-      top: 50%;
-      left: @space-sm;
-      transform: translateY(-50%);
-    }
-    input[type='text'] {
-      border-radius: 2em;
-      padding: @space-sm @space-md;
-      padding-left: 3em;
-      border: 0;
-      width: 100%;
-      height: 100%;
-      background-color: transparent;
-      &::placeholder {
-        color: #fff;
-      }
-      &:focus {
-        outline: none;
-        box-shadow: none;
-      }
-    }
-  }
 }
 
-@media (max-width: 768px) {
-  .search {
-    width: 10em !important;
-  }
+.search-bar-input {
+  width: 400px;
+  height: 1px;
 
-  .tagline {
-    display: none;
-  }
-}
+  font-size: 10px;
 
-.notificationsContainer {
-  position: absolute;
-  margin: 7px 0px 0px 30px;
-
-  > div {
-    position: relative;
-  }
-
-  .searchError {
-    background: rgba(208, 33, 45, 0.85);
-    margin-bottom: 5px;
-    border-radius: 5px;
-    font-size: 14px;
-
-    padding: 10px 15px;
-    max-width: 250px;
-  }
+  padding: 20px 20px !important;
+  margin: 2px;
+  border: 0px !important;
+  border-radius: 5px !important;
+  box-shadow: 0 0 0.4em rgba(0, 0, 0, 0.5);
+	outline: none;
 }
 </style>
 <template>
@@ -115,38 +72,30 @@
       <div class="navbar-header">
         <div class="site-brand flex-horizontal">
           <router-link class="navbar-brand" to="/" />
-          <span class="tagline">Open Consensus for 10B</span>
+          <span class="tagline">Blockchain Explorer</span>
         </div>
         <div class="navbar-actions">
-          <router-link v-if="showNav" class="navbar-nav" to="/dashboard">
-            Dashboard
-          </router-link>
-          <router-link v-if="showNav" class="navbar-nav" to="/blocks">
-            Explorer
-          </router-link>
-          <div>
-            <div class="search">
-              <font-awesome-icon class="search-icon" icon="search" />
-              <input
-                v-model="input"
-                type="text"
-                placeholder="Block Hash / Tx Hash / Account..."
-                @keyup.enter="search"
-              />
-            </div>
-            <div class="notificationsContainer">
-              <notifications group="search">
-                <template slot="body" slot-scope="props">
-                  <div class="searchError">
-                    <a class="close" @click="props.close">
-                      <i class="fa fa-fw fa-close" />
-                    </a>
-                    <div v-html="props.item.text" />
-                  </div>
-                </template>
-              </notifications>
-            </div>
+          <div v-if="$route.name !== 'HomePage'" class="search-bar-body">
+            <input
+              type="text"
+              placeholder="Search for Blocks / Transactions / Accounts..."
+              class="search-bar-input"
+              v-model="textSearchBar"
+              @keyup.enter="searchQuery()"
+            />
           </div>
+          <router-link class="navbar-nav" to="/blocks">
+            Blocks
+          </router-link>
+          <router-link class="navbar-nav" to="/txs">
+            Transactions
+          </router-link>
+          <router-link class="navbar-nav" to="/staking-txs">
+            Staking
+          </router-link>
+          <router-link class="navbar-nav" to="/stats">
+            Stats
+          </router-link>
         </div>
       </div>
     </div>
@@ -155,23 +104,50 @@
 
 <script>
 import service from '../explorer/service';
+import store from '../explorer/store';
+
 export default {
   name: 'SiteHeader',
   data() {
     return {
-      input: '',
-      showNav: localStorage.getItem('nav'),
+      textSearchBar: ''
     };
   },
   methods: {
-    search() {
-      let input = this.input.trim();
-      this.input = '';
-      if (!input) {
-        //  || (input.length !== 32 && input.length !== 20)
-        alert('invalid input');
-        return;
+    searchQuery() {
+      let input = this.textSearchBar.trim();
+      this.textSearchBar = '';
+
+      // is block height?
+      if (input.substring(0,2) !== '0x' &&
+        input.substring(0,3) !== 'one') {
+        let block_height = parseInt(input.replaceAll(',', ''));
+        if (isNaN(block_height) == false) {
+          service
+            .getBlockHashByNumber(block_height)
+            .then(result => {
+              let hash = result['data']['hash'];
+
+              this.$router.push(`/block/${hash}`);
+            });
+
+            return;
+        }
       }
+
+      // is pending?
+      let pendingTxs = store.data.pendingTxs;
+      for (let shard_id in pendingTxs) {
+        if (pendingTxs.hasOwnProperty(shard_id)) {
+          for (let i = 0; i < pendingTxs[shard_id].length; i ++) {
+            if (pendingTxs[shard_id][i]['hash'] == input) {
+              this.$router.push(`/tx/${input}`);
+              return;
+            }
+          }
+        }
+      }
+
       service
         .search(input)
         .then(result => {
@@ -181,22 +157,12 @@ export default {
             this.$router.push(`/tx/${input}`);
           } else if (result.type === 'address') {
             this.$router.push(`/address/${input}`);
+          } else {
+            alert('invalid search query');
           }
         })
         .catch(r => {
-          let errMessage = 'Not Found!';
-
-          if (r.response && r.response.data && r.response.data.err) {
-            errMessage = r.response.data.err;
-          }
-
-          this.$notify({
-            group: 'search',
-            position: 'top center',
-            type: 'search-error',
-            text: 'Search failed: ' + errMessage,
-            duration: 3000,
-          });
+          alert('invalid search query')
         });
     },
   },

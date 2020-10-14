@@ -1,6 +1,6 @@
 import Vue from 'vue';
 
-const Limit = 10;
+const Limit = 20;
 function postprocessBlocks(items) {
   return items
     .sort((a, b) => (Number(a.timestamp) > Number(b.timestamp) ? -1 : 1))
@@ -32,7 +32,10 @@ let store = {
     txCount: 0,
     stakingTxCount: 0,
     nodeCount: 0,
+    marketCap: '0',
     lastUpdateTime: 0,
+    validators: [],
+    pendingTxs: {},
   },
 
   update(data) {
@@ -123,6 +126,21 @@ let store = {
         .filter(x => isFinite(x))
     );
   },
+  updateMarketCap(price) {
+    this.data.marketCap = price;
+  },
+  updateValidators(validators) {
+    this.data.validators = validators;
+  },
+  updatePendingTransactions(txs, shardID) {
+    // Need temp reference for update signal
+    let pendingTxs = this.data.pendingTxs;
+    this.data.pendingTxs = null;
+
+    pendingTxs[shardID] = txs;
+
+    this.data.pendingTxs = pendingTxs;
+  },
   reset() {
     this.data.blocks = [];
     this.data.txs = [];
@@ -133,6 +151,8 @@ let store = {
     this.data.nodeCount = 0;
     this.data.nodes = {};
     this.data.shardCount = 0;
+    this.data.validators = [];
+    this.data.pendingTxs = {};
   },
 };
 

@@ -1,5 +1,6 @@
 import axios from 'axios';
 import store from './store';
+import moment from 'moment';
 
 // For test: asios.get('...').delay(1000)
 Promise.prototype.delay = function(time) {
@@ -11,10 +12,15 @@ Promise.prototype.delay = function(time) {
 };
 
 // const BACKEND_URL = `${'explorer.os.hmny.io'}:8888`;
-const BACKEND_URL = `${window.location.hostname}:8888`;
+// const BACKEND_URL = `${window.location.hostname}:8888`;
+const BACKEND_URL = `${'explorer.harmony.one'}:8888`;
+const INSIGHT_BACKEND_URL = "http://54.187.20.215:8081"
 
 const HTTP_BACKEND_URL = `https://${BACKEND_URL}`;
 const SECRET = localStorage.getItem('secret');
+
+// To be defined in listenWebsocket()
+let ws = null;
 
 function sendPost(url, params, config) {
   return axios.post(HTTP_BACKEND_URL + url, params, config);
@@ -34,8 +40,8 @@ function sendGet(url, params) {
   return axios.get(HTTP_BACKEND_URL + url, params); // .delay(500)
 }
 
-(function listenWebsocket() {
-  const ws = new WebSocket(`wss://${BACKEND_URL}`, [SECRET]);
+function listenBackendWebsocket() {
+  ws = new WebSocket(`wss://${BACKEND_URL}`, [SECRET]);
 
   ws.addEventListener('open', () => {
     ws.send('front-end: Hi.');
@@ -66,12 +72,29 @@ function sendGet(url, params) {
   });
 
   ws.addEventListener('error', error => {
-    console.log('error', error);
+    console.log('Websocket error', error);
   });
 
   ws.addEventListener('close', () => {
-    console.log('close');
+    console.log('Websocket closed');
   });
+}
+
+listenBackendWebsocket();
+
+(function reconnectBackendWebsocket() {
+  setInterval(() => {
+    if (ws === null || ws.readyState === WebSocket.CLOSED) {
+      // connect
+      console.log('Connecting websocket...');
+      listenBackendWebsocket();
+      console.log('Connected!');
+    }
+  }, 5000);
+})();
+
+(function logUserVisit() {
+  axios.get(INSIGHT_BACKEND_URL + "/user_visits");
 })();
 
 export default {
@@ -91,6 +114,11 @@ export default {
 
       return block;
     });
+  },
+  getBlockHashByNumber(height) {
+    return axios.get(INSIGHT_BACKEND_URL +
+      "/block_hash_by_number?block_height=" +
+      height);
   },
   getTransactions(cursor, size) {
     return authGet('/txs-new', { params: { cursor, size } }).then(res => {
@@ -112,7 +140,21 @@ export default {
     return authGet('/tx', { params: { id } }).then(res => {
       let tx = res.data.tx;
 
-      return tx;
+      if (tx.status !== 'UNKNOWN') {
+        return tx;
+      }
+
+      // Check if pending
+      for (var shard in store.data.pendingTxs) {
+        if (store.data.pendingTxs.hasOwnProperty(shard)) {
+          for (let t in store.data.pendingTxs[shard]) {
+            if (store.data.pendingTxs[shard][t].hash === id) {
+              return store.data.pendingTxs[shard][t];
+            }
+          }
+        }
+      }
+      return null;
     });
   },
   getStakingTransaction(id) {
@@ -121,6 +163,30 @@ export default {
 
       return tx;
     });
+  },
+  getTransactionVolume(start_height) {
+    return axios.get(INSIGHT_BACKEND_URL +
+      "/block_transaction_count?min_block_height=" +
+      start_height);
+  },
+  getGasUsed(start_height) {
+    return axios.get(INSIGHT_BACKEND_URL +
+      "/block_gas_used?min_block_height=" +
+      start_height);
+  },
+
+  getValidatorByAddress(address) {
+    return axios.get(INSIGHT_BACKEND_URL +
+      "/validator_by_address?address=" +
+      address);
+  },
+  getMaxBlockHeightTransactionVolume() {
+    return axios.get(INSIGHT_BACKEND_URL +
+      "/max_block_height_block_transaction_count")
+  },
+  getMaxBlockHeightGasUsed() {
+    return axios.get(INSIGHT_BACKEND_URL +
+      "/max_block_height_block_gas_used")
   },
   getCoinStats() {
     return authGet('/coin-stats').then(res => {
